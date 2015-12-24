@@ -1,7 +1,8 @@
 
+(load "~/bottega/stockfighter/key.lisp")
 
 (defvar *base-url* "https://api.stockfighter.io/ob/api")
-(defvar *api-key* "b930cec8874176951e5d84ba94f62badc300c662")
+(defvar *api-key* (return-key "~/bottega/stockfighter/api-key.txt"))
 
 (setf *venue* "HOPBEX")
 (setf *stock* "FKUI")
@@ -23,20 +24,20 @@
 ;           :want-stream t)))
 ;   (st-json:read-json stream)))
 
-(defun get-quote ()
-  (let* ((extra-headers (list (cons "X-Starfighter-Authorization" *api-key*)))
-        (url (concatenate 'string *base-url* "/venues/" *venue* "/stocks/" *stock* "/quote"))
-        (stream (drakma:http-request url
-                                    :additional-headers extra-headers
-                                    :want-stream t)))
-  (setf (flexi-streams:flexi-stream-external-format stream) :utf-8)
-  (yason:parse stream :object-as :alist)))
+; (defun get-quote ()
+  ; (let* ((extra-headers (list (cons "X-Starfighter-Authorization" *api-key*)))
+        ; (url (concatenate 'string *base-url* "/venues/" *venue* "/stocks/" *stock* "/quote"))
+        ; (stream (drakma:http-request url
+                                    ; :additional-headers extra-headers
+                                    ; :want-stream t)))
+  ; (setf (flexi-streams:flexi-stream-external-format stream) :utf-8)
+  ; (yason:parse stream :object-as :alist)))
+; 
+; (defun get-bid-from-quote (a-quote)
+  ; (cdr (assoc "bid" a-quote :test #'string=)))
 
-(defun get-bid-from-quote (a-quote)
-  (cdr (assoc "bid" a-quote :test #'string=)))
+;(setf my-quote (get-quote))
 
-(setf my-quote (get-quote))
+;(get-bid-from-quote my-quote)
 
-(get-bid-from-quote my-quote)
-
-(get-quote)
+;(get-quote)
