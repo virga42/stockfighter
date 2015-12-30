@@ -63,12 +63,6 @@
 (defun process-response ()
 	(prepare-response *resp* account tickers venues))
 
-; (defun assign-response-values (response)
-; 	(progn
-; 		(setf venues (car (cdr (assoc :venues response))))
-; 		(setf account (cdr (assoc :account response)))
-; 		(setf tickers (car (cdr (assoc :tickers response))))))
-
 (defun check-venue-up ()
 	(let* ((venue (car venues))
 			  (url #?"${base-url}/venues/${venue}/heartbeat"))
@@ -85,11 +79,22 @@
 		(api-get url)))
 
 (defun get-cheapest-price (order-book)
-	'())
+	(let ((bids-list (cdr (assoc :BIDS order-book)))
+				 (cheapest-bid '())
+				 (cheapest-price 0))
+		(loop for bid in bids-list do (when (or (= cheapest-price 0) 
+																				(< (cdr (assoc :PRICE bid)) cheapest-price)) 
+																					(progn 
+																						(setf cheapest-price (cdr (assoc :PRICE bid)))
+																						(setf cheapest-bid (list (cdr (assoc :PRICE bid))
+																																		 (cdr (assoc :QTY bid)))))))
+		cheapest-bid))
+
+; (defun get-response-stats (response)
+	
 
 (defun place-order (stock-sym price qty dir order-type)
 	(let* ((venue (car venues))
-				 (stock (car tickers))
 				 (order (cl-json:encode-json-to-string (list 
 																			`("account" . ,account)
 																			`("venue" . ,venue)
@@ -99,7 +104,6 @@
 																			`("direction" . ,dir)
 																			`("orderType" . ,order-type))))
 			(url #?"${base-url}/venues/${venue}/stocks/${stock-sym}/orders"))
-		(print order)
 		(api-post url order)))
 
 (defun verify-get-heartbeat ()
@@ -125,3 +129,17 @@
 
 (setf *resp* (first-level))
 (process-response)
+
+(defparameter response '())
+
+(defun place-an-order ()
+	(let* ((stock (car tickers)) 
+				 (order-book (get-order-book-for-stock stock))
+				 (best-bid (get-cheapest-price order-book)) 
+				 (price (+ 100 (car best-bid))) 
+				 (qty 100)
+				 (response '())) 
+		(setf response (place-order stock price qty "buy" "market"))
+		response))
+
+(setf response (place-an-order))
