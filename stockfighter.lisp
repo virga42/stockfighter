@@ -1,43 +1,127 @@
 
 (load "~/bottega/stockfighter/key.lisp")
+(load "~/bottega/unit_test_framework/unit_test_framework.lisp")
 
-(defvar *base-url* "https://api.stockfighter.io/ob/api")
-(defvar *api-key* (return-key "~/bottega/stockfighter/api-key.txt"))
+(defvar first-time-loadp t)
+(defvar *debug* nil)
+(defvar base-url "https://api.stockfighter.io/ob/api")
+(defvar persistent-key (return-key "~/bottega/stockfighter/api-key.txt"))
 
-(setf *venue* "HOPBEX")
-(setf *stock* "FKUI")
-(setf *account* "SAH13759300") 
+(if first-time-loadp
+	(progn
+		(sleep .1)
+		(ql:quickload "drakma")
+		(ql:quickload "cl-json")
+		(ql:quickload "cl-interpol")
+		(sleep 10)
+		(cl-interpol:ENABLE-INTERPOL-SYNTAX)
+		(setf first-time-loadp nil)))
 
-(defvar *req* '(("account" . *account*) ("venue" . *venue*) ("symbol" . *stock*) ("price" . 2500) ("qty" . 100) ("direction" . "buy") ("orderType" . "limit")))
+(defun api-get (request)
+	(if *debug* (print request))
+	(cl-json:decode-json-from-source (drakma:http-request request
+		:additional-headers (list (cons "X-Starfighter-Authorization"  persistent-key))
+		:method :get
+		:want-stream t)))
 
-; (defun make-trade (request)
-;   (let* ((extra-headers (list (cons "X-Starfighter-Authorization" *api-key*)))
-;         (url (concatenate 'string *base-url* "/venues/" *venue* "/stocks/" *stock* "/orders"))
-;         (stream (drakma:http-request url
-;           :additional-headers extra-headers
-;           :accept "application/json"
-;           :method :post
-;           :content-type "application/json"
-;           :external-format-out :utf-8
-;           :external-format-in :utf-8
-;           :content (json:encode-json-to-string request)
-;           :want-stream t)))
-;   (st-json:read-json stream)))
+(defun api-post (url content)
+	(cl-json:decode-json-from-source 
+		(drakma:http-request url
+			:additional-headers (list (cons "X-Starfighter-Authorization"  persistent-key))
+			:method :post
+			:content content
+			:want-stream t)))
 
-; (defun get-quote ()
-  ; (let* ((extra-headers (list (cons "X-Starfighter-Authorization" *api-key*)))
-        ; (url (concatenate 'string *base-url* "/venues/" *venue* "/stocks/" *stock* "/quote"))
-        ; (stream (drakma:http-request url
-                                    ; :additional-headers extra-headers
-                                    ; :want-stream t)))
-  ; (setf (flexi-streams:flexi-stream-external-format stream) :utf-8)
-  ; (yason:parse stream :object-as :alist)))
-; 
-; (defun get-bid-from-quote (a-quote)
-  ; (cdr (assoc "bid" a-quote :test #'string=)))
+(defun api-delete (url content)
+	(if *debug* (print url))
+		(cl-json:decode-json-from-source 
+			(drakma:http-request url
+				:additional-headers (list (cons "X-Starfighter-Authorization"  persistent-key))
+				:method :delete
+				:content content
+				:want-stream t)))
 
-;(setf my-quote (get-quote))
+(defun get-heartbeat ()
+	(let ((url #?"${base-url}/heartbeat"))
+	(api-get url)))
 
-;(get-bid-from-quote my-quote)
+(defun first-level ()
+	(let ((url "https://api.stockfighter.io/gm/levels/first_steps"))
+	(api-post url nil)))
 
-;(get-quote)
+(defun make-keyword (name) (values (intern (string-upcase name) "KEYWORD")))
+
+(defmacro prepare-response (transaction &rest my-items)
+  `(progn
+  	,@(loop for i in my-items collect `(setf ,i (cdr (assoc (make-keyword ',i) ,transaction))))))
+
+(defparameter account "")
+(defparameter tickers '("FOOBAR"))
+(defparameter venues '("TESTEX"))
+(defparameter *resp* '())
+
+(defun process-response ()
+	(prepare-response *resp* account tickers venues))
+
+; (defun assign-response-values (response)
+; 	(progn
+; 		(setf venues (car (cdr (assoc :venues response))))
+; 		(setf account (cdr (assoc :account response)))
+; 		(setf tickers (car (cdr (assoc :tickers response))))))
+
+(defun check-venue-up ()
+	(let* ((venue (car venues))
+			  (url #?"${base-url}/venues/${venue}/heartbeat"))
+	(api-get url)))
+
+(defun get-stocks-on-venue ()
+	(let* ((venue (car venues))
+			  (url #?"${base-url}/venues/${venue}/stocks"))
+		(api-get url)))
+
+(defun get-order-book-for-stock (&optional (stock "FOOBAR"))
+	(let* ((venue (car venues))
+				 (url #?"${base-url}/venues/${venue}/stocks/${stock}"))
+		(api-get url)))
+
+(defun get-cheapest-price (order-book)
+	'())
+
+(defun place-order (stock-sym price qty dir order-type)
+	(let* ((venue (car venues))
+				 (stock (car tickers))
+				 (order (cl-json:encode-json-to-string (list 
+																			`("account" . ,account)
+																			`("venue" . ,venue)
+																			`("stock" . ,stock-sym)
+																			`("qty" . ,qty)
+																			`("price" . ,price)
+																			`("direction" . ,dir)
+																			`("orderType" . ,order-type))))
+			(url #?"${base-url}/venues/${venue}/stocks/${stock-sym}/orders"))
+		(print order)
+		(api-post url order)))
+
+(defun verify-get-heartbeat ()
+	(eq t (cdr (assoc :OK (get-heartbeat)))))
+
+(defun verify-venue-up ()
+	(eq t (cdr (assoc :OK (check-venue-up)))))
+
+(defun verify-stocks-on-venue ()
+	(eq t (cdr (assoc :OK (get-stocks-on-venue)))))
+
+(defun verify-order-book ()
+	(eq t (cdr (assoc :OK (get-order-book-for-stock)))))
+	
+(defun perform-tests ()
+	(check
+		(verify-get-heartbeat)
+		(verify-venue-up)
+		(verify-stocks-on-venue)
+		(verify-order-book)))
+
+(perform-tests)
+
+(setf *resp* (first-level))
+(process-response)
