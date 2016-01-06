@@ -9,11 +9,6 @@
 
 (if first-time-loadp
 	(progn
-		(sleep .1)
-		(ql:quickload "drakma")
-		(ql:quickload "cl-json")
-		(ql:quickload "cl-interpol")
-		(sleep 10)
 		(cl-interpol:ENABLE-INTERPOL-SYNTAX)
 		(setf first-time-loadp nil)))
 
