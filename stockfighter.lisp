@@ -46,17 +46,23 @@
 
 (defun make-keyword (name) (values (intern (string-upcase name) "KEYWORD")))
 
-(defmacro prepare-response (transaction &rest my-items)
-  `(progn
-  	,@(loop for i in my-items collect `(setf ,i (cdr (assoc (make-keyword ',i) ,transaction))))))
+(defun get-attribute-from-response-by-key (attribute response)
+	(cdr (assoc 'attribute response)))
 
-(defparameter account "")
-(defparameter tickers '("FOOBAR"))
-(defparameter venues '("TESTEX"))
-(defparameter *resp* '())
+(defmacro with-response (response attributes &body body)
+  `(let ,(loop for attribute in attributes collect `(,attribute (get-value-by-key (make-keyword ',attribute) ,response)))
+    ,@body))
 
-(defun process-response ()
-	(prepare-response *resp* account tickers venues))
+(defun get-order-book (session) 
+	(with-response session 
+								 (venues tickers account) 
+								 (GET-ORDER-BOOK-FOR-STOCK (car venues) 
+								 													 (car tickers))))
+
+(defun get-bids-from-order-book (order-book)
+	(with-response order-book
+								 (bids)
+								 (print bids)))
 
 (defun check-venue-up ()
 	(let* ((venue (car venues))
@@ -68,9 +74,8 @@
 			  (url #?"${base-url}/venues/${venue}/stocks"))
 		(api-get url)))
 
-(defun get-order-book-for-stock (&optional (stock "FOOBAR"))
-	(let* ((venue (car venues))
-				 (url #?"${base-url}/venues/${venue}/stocks/${stock}"))
+(defun get-order-book-for-stock (venue &optional (stock "FOOBAR"))
+	(let ((url #?"${base-url}/venues/${venue}/stocks/${stock}"))
 		(api-get url)))
 
 (defun get-cheapest-price (order-book)
@@ -83,10 +88,7 @@
 																						(setf cheapest-price (cdr (assoc :PRICE bid)))
 																						(setf cheapest-bid (list (cdr (assoc :PRICE bid))
 																																		 (cdr (assoc :QTY bid)))))))
-		cheapest-bid))
-
-; (defun get-response-stats (response)
-	
+		cheapest-bid))	
 
 (defun place-order (stock-sym price qty dir order-type)
 	(let* ((venue (car venues))
@@ -120,21 +122,4 @@
 		(verify-stocks-on-venue)
 		(verify-order-book)))
 
-(perform-tests)
-
-(setf *resp* (first-level))
-(process-response)
-
-(defparameter response '())
-
-(defun place-an-order ()
-	(let* ((stock (car tickers)) 
-				 (order-book (get-order-book-for-stock stock))
-				 (best-bid (get-cheapest-price order-book)) 
-				 (price (+ 100 (car best-bid))) 
-				 (qty 100)
-				 (response '())) 
-		(setf response (place-order stock price qty "buy" "market"))
-		response))
-
-(setf response (place-an-order))
+; (perform-tests)
