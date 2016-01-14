@@ -2,10 +2,10 @@
 (load "~/bottega/stockfighter/key.lisp")
 (load "~/bottega/unit_test_framework/unit_test_framework.lisp")
 
-(defvar first-time-loadp t)
-(defvar *debug* nil)
-(defvar base-url "https://api.stockfighter.io/ob/api")
-(defvar persistent-key (return-key "~/bottega/stockfighter/api-key.txt"))
+(defparameter first-time-loadp t)
+(defparameter *debug* nil)
+(defparameter base-url "https://api.stockfighter.io/ob/api")
+(defparameter persistent-key (return-key "~/bottega/stockfighter/api-key.txt"))
 
 (if first-time-loadp
 	(progn
@@ -42,12 +42,16 @@
 
 (defun first-level ()
 	(let ((url "https://api.stockfighter.io/gm/levels/first_steps"))
-	(api-post url nil)))
+		(api-post url nil)))
+
+(defun second-level ()
+	(let ((url "https://www.stockfighter.io/ui/play/blotter#chock_a_block"))
+		(api-post url nil)))
 
 (defun make-keyword (name) (values (intern (string-upcase name) "KEYWORD")))
 
-(defun get-attribute-from-response-by-key (attribute response)
-	(cdr (assoc 'attribute response)))
+(defun get-value-by-key (attribute response)
+	(cdr (assoc attribute response)))
 
 (defmacro with-response (response attributes &body body)
   `(let ,(loop for attribute in attributes collect `(,attribute (get-value-by-key (make-keyword ',attribute) ,response)))
@@ -62,7 +66,7 @@
 (defun get-bids-from-order-book (order-book)
 	(with-response order-book
 								 (bids)
-								 (print bids)))
+								 bids))
 
 (defun check-venue-up ()
 	(let* ((venue (car venues))
@@ -123,3 +127,47 @@
 		(verify-order-book)))
 
 ; (perform-tests)
+
+; (setf session (first-level))
+
+; (setf order (with-response session (account venues tickers) (cl-json:encode-json-to-string (list 
+; 								(list "account" account)
+; 								(list "venue" (car venues))
+; 								(list "stock" (car tickers))
+; 								(list "qty" 100)
+; 								(list "price" 2000)
+; 								(list "direction" "buy")
+; 								(list "orderType" "fill-or-kill")))))
+
+; '(XYZ (((name "Toilet Paper Industries") (price 2000) (timestamp 2016-01-12))))
+
+(defun make-stock (stock-symbol &key (name "Anonymous Stock") (initial-price '(0 nil)))
+	(list stock-symbol name (list initial-price)))
+
+(defun make-stock-price (price &key timestamp)
+		(list price timestamp))
+
+(defun stock-symbol (stock)
+	(first stock))
+
+(defun stock-name (stock)
+	(second stock))
+
+(defun stock-prices (stock)
+	(third stock))
+
+(defun append-price (stock price)
+	(list (stock-symbol stock) (stock-name stock) (append (list price) (stock-prices stock))))
+
+(defun verify-stock-creation ()
+	(let ((test-stock (make-stock 'YYY :name "Test Stock" :initial-price (make-stock-price 999 :timestamp 1))))
+		(print test-stock)
+		(setf test-stock (append-price test-stock (make-stock-price 777 :timestamp 2)))
+		(print test-stock)))
+
+
+
+; (make-stock 'zyx :name "Toilet Paper Industries" :snapshot (make-snapshot '(price 2000) '(timestamp 2016-01-12)))
+
+
+
